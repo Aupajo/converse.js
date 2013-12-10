@@ -7,6 +7,12 @@
  */
 
 // AMD/global registrations
+
+// FIXME update calls to hex_sha1 with new CryptoJS API
+var hex_sha1 = function(message) {
+    return CryptoJS.SHA1(message).toString(CryptoJS.enc.Hex);
+};
+
 (function (root, factory) {
     if (typeof console === "undefined" || typeof console.log === "undefined") {
         console = { log: function () {}, error: function () {} };
