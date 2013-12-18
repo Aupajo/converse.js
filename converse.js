@@ -143,6 +143,7 @@ var hex_sha1 = function(message) {
         this.prebind = false;
         this.show_controlbox_by_default = false;
         this.show_only_online_users = false;
+        this.show_call_button = false;
         this.show_emoticons = true;
         this.show_toolbar = true;
         this.use_vcards = true;
@@ -173,6 +174,7 @@ var hex_sha1 = function(message) {
             'show_emoticons',
             'show_only_online_users',
             'show_toolbar',
+            'show_call_button',
             'sid',
             'use_vcards',
             'xhr_custom_status',
@@ -736,7 +738,8 @@ var hex_sha1 = function(message) {
                 'click .toggle-otr': 'toggleOTRMenu',
                 'click .start-otr': 'startOTRFromToolbar',
                 'click .end-otr': 'endOTR',
-                'click .auth-otr': 'authOTR'
+                'click .auth-otr': 'authOTR',
+                'click .toggle-call': 'toggleCall'
             },
 
             template: _.template(
@@ -779,6 +782,9 @@ var hex_sha1 = function(message) {
                             '<li><a class="icon-heart" href="#" data-emoticon="<3"></a></li>'+
                         '</ul>' +
                     '</li>' +
+                '{[ } ]}' +
+                '{[ if (' + converse.show_call_button + ')  { ]}' +
+                    '<li><a class="toggle-call icon-phone" title="Start a call"></a></li>' +
                 '{[ } ]}' +
                 '{[ if (allow_otr)  { ]}' +
                     '<li class="toggle-otr {{otr_status_class}}" title="{{otr_tooltip}}">'+
@@ -1176,6 +1182,14 @@ var hex_sha1 = function(message) {
                 } else {
                     this.showHelpMessages([__('Invalid authentication scheme provided')], 'error');
                 }
+            },
+
+            toggleCall: function (ev) {
+                ev.stopPropagation();
+
+                $('#conversejs').trigger('converse:callButtonClicked', {
+                    connection: converse.connection
+                });
             },
 
             onChange: function (item, changed) {
