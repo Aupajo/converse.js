@@ -1187,7 +1187,7 @@ var hex_sha1 = function(message) {
             toggleCall: function (ev) {
                 ev.stopPropagation();
 
-                $('#conversejs').trigger('converse:callButtonClicked', {
+                converse.emit('onCallButtonClicked', {
                     connection: converse.connection
                 });
             },
