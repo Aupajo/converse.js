@@ -103,6 +103,10 @@ var hex_sha1 = function(message) {
         },
         off: function(evt, handler) {
             $(this).unbind(evt, handler);
+        },
+        alert: function(message, deferred) {
+            alert(message);
+            deferred.resolve();
         }
     };
 
@@ -534,15 +538,23 @@ var hex_sha1 = function(message) {
                 }
             },
 
-            getSession: function () {
+            showAlert: function(message) {
+                var didDisplayMessage = $.Deferred();
+                converse.alert(message, didDisplayMessage);
+                return didDisplayMessage.promise();
+            },
+
+            withSession: function (callback) {
                 // XXX: sessionStorage is not supported in IE < 8. Perhaps a
                 // user alert is required here...
+                var context = this;
                 var saved_key = window.sessionStorage[hex_sha1(this.id+'priv_key')];
                 var instance_tag = window.sessionStorage[hex_sha1(this.id+'instance_tag')];
                 var cipher = CryptoJS.lib.PasswordBasedCipher;
                 var pass = converse.connection.pass;
                 var pass_check = this.get('pass_check');
-                var result, key;
+                var key, alertMessage;
+
                 if (saved_key && instance_tag && typeof pass_check !== 'undefined') {
                     var decrypted = cipher.decrypt(CryptoJS.algo.AES, saved_key, pass);
                     key = DSA.parsePrivate(decrypted.toString(CryptoJS.enc.Latin1));
@@ -556,21 +568,24 @@ var hex_sha1 = function(message) {
                     }
                 }
                 // We need to generate a new key and instance tag
-                result = alert(__('Your browser needs to generate a private key, which will be used in your encrypted chat session. This can take up to 30 seconds during which your browser might freeze and become unresponsive.'));
-                instance_tag = OTR.makeInstanceTag();
-                key = new DSA();
-                // Encrypt the key and set in sessionStorage. Also store
-                // instance tag
-                window.sessionStorage[hex_sha1(this.id+'priv_key')] =
-                    cipher.encrypt(CryptoJS.algo.AES, key.packPrivate(), pass).toString();
-                window.sessionStorage[hex_sha1(this.id+'instance_tag')] = instance_tag;
+                alertMessage = this.showAlert(__('Your browser needs to generate a private key, which will be used in your encrypted chat session. This can take up to 30 seconds during which your browser might freeze and become unresponsive.'));
+                
+                alertMessage.done(function() {
+                    instance_tag = OTR.makeInstanceTag();
+                    key = new DSA();
+                    // Encrypt the key and set in sessionStorage. Also store
+                    // instance tag
+                    window.sessionStorage[hex_sha1(context.id+'priv_key')] =
+                        cipher.encrypt(CryptoJS.algo.AES, key.packPrivate(), pass).toString();
+                    window.sessionStorage[hex_sha1(context.id+'instance_tag')] = instance_tag;
 
-                this.trigger('showHelpMessages', [__('Private key generated.')]);
-                this.save({'pass_check': cipher.encrypt(CryptoJS.algo.AES, 'match', pass).toString()});
-                return {
-                    'key': key,
-                    'instance_tag': instance_tag
-                };
+                    context.trigger('showHelpMessages', [__('Private key generated.')]);
+                    context.save({'pass_check': cipher.encrypt(CryptoJS.algo.AES, 'match', pass).toString()});
+                    callback({
+                        'key': key,
+                        'instance_tag': instance_tag
+                    });
+                });
             },
 
             updateOTRStatus: function (state) {
@@ -623,32 +638,34 @@ var hex_sha1 = function(message) {
                 // query message from our buddy. Otherwise, it is us who will
                 // send the query message to them.
                 this.save({'otr_status': UNENCRYPTED});
-                var session = this.getSession();
-                this.otr = new OTR({
+
+                this.withSession(function(session) {
+                    this.otr = new OTR({
                     fragment_size: 140,
                     send_interval: 200,
                     priv: session.key,
                     instance_tag: session.instance_tag,
                     debug: this.debug
+                    });
+                    this.otr.on('status', $.proxy(this.updateOTRStatus, this));
+                    this.otr.on('smp', $.proxy(this.onSMP, this));
+
+                    this.otr.on('ui', $.proxy(function (msg) {
+                        this.trigger('showReceivedOTRMessage', msg);
+                    }, this));
+                    this.otr.on('io', $.proxy(function (msg) {
+                        this.trigger('sendMessageStanza', msg);
+                    }, this));
+                    this.otr.on('error', $.proxy(function (msg) {
+                        this.trigger('showOTRError', msg);
+                    }, this));
+
+                    if (query_msg) {
+                        this.otr.receiveMsg(query_msg);
+                    } else {
+                        this.otr.sendQueryMsg();
+                    }
                 });
-                this.otr.on('status', $.proxy(this.updateOTRStatus, this));
-                this.otr.on('smp', $.proxy(this.onSMP, this));
-
-                this.otr.on('ui', $.proxy(function (msg) {
-                    this.trigger('showReceivedOTRMessage', msg);
-                }, this));
-                this.otr.on('io', $.proxy(function (msg) {
-                    this.trigger('sendMessageStanza', msg);
-                }, this));
-                this.otr.on('error', $.proxy(function (msg) {
-                    this.trigger('showOTRError', msg);
-                }, this));
-
-                if (query_msg) {
-                    this.otr.receiveMsg(query_msg);
-                } else {
-                    this.otr.sendQueryMsg();
-                }
             },
 
             endOTR: function () {
