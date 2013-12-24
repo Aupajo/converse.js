@@ -158,7 +158,6 @@ var hex_sha1 = function(message) {
         this.xhr_custom_status_url = '';
         this.xhr_user_search = false;
         this.xhr_user_search_url = '';
-        this.use_otr_by_default = false;
 
         // Allow only whitelisted configuration attributes to be overwritten
         _.extend(this, _.pick(settings, [
@@ -188,14 +187,10 @@ var hex_sha1 = function(message) {
             'xhr_custom_status_url',
             'xhr_user_search',
             'xhr_user_search_url',
-            'use_otr_by_default'
         ]));
 
         // Only allow OTR if we have the capability
         this.allow_otr = this.allow_otr && HAS_CRYPTO;
-
-        // Only use OTR by default if allow OTR is enabled to begin with
-        this.use_otr_by_default = this.use_otr_by_default && this.allow_otr;
 
         // Translation machinery
         // ---------------------
@@ -527,9 +522,6 @@ var hex_sha1 = function(message) {
         this.ChatBox = Backbone.Model.extend({
             initialize: function () {
                 if (this.get('box_id') !== 'controlbox') {
-                    if (_.contains([UNVERIFIED, VERIFIED], this.get('otr_status'))) {
-                        this.initiateOTR();
-                    }
                     this.messages = new converse.Messages();
                     this.messages.localStorage = new Backbone.LocalStorage(
                         hex_sha1('converse.messages'+this.get('jid')+converse.bare_jid));
@@ -538,6 +530,8 @@ var hex_sha1 = function(message) {
                         'box_id' : hex_sha1(this.get('jid')),
                         'otr_status': this.get('otr_status') || UNENCRYPTED
                     });
+
+                    this.initiateOTR();
                 }
             },
 
@@ -644,7 +638,7 @@ var hex_sha1 = function(message) {
 
                 this.withSession(function(session) {
                     this.otr = new OTR({
-                    fragment_size: 140,
+                    fragment_size: 50000,
                     send_interval: 200,
                     priv: session.key,
                     instance_tag: session.instance_tag,
@@ -876,10 +870,6 @@ var hex_sha1 = function(message) {
 
                 if (this.model.get('status')) {
                     this.showStatusMessage(this.model.get('status'));
-                }
-
-                if (converse.use_otr_by_default) {
-                    this.model.initiateOTR();
                 }
             },
 
