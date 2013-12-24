@@ -122,6 +122,9 @@ var hex_sha1 = function(message) {
         var KEY = {
             ENTER: 13
         };
+        var QUERY_RESOURCE = '?QUERY_RESOURCE?';
+        var RESOURCE_REPLY = '?RESOURCE?';
+
         var HAS_CSPRNG = ((typeof crypto !== 'undefined') &&
             ((typeof crypto.randomBytes === 'function') ||
                 (typeof crypto.getRandomValues === 'function')
@@ -1000,6 +1003,16 @@ var hex_sha1 = function(message) {
                         }));
                     }
                 }
+
+                switch(message.get('message')) {
+                    case QUERY_RESOURCE:
+                        this.sendMessageStanza(RESOURCE_REPLY);
+                        return;
+                    case RESOURCE_REPLY:
+                        converse.emit('onResourceReceived', message, $chat_content);
+                        return;
+                }
+
                 if (message.get('composing')) {
                     this.showStatusNotification(message.get('fullname')+' '+'is typing');
                     return;
@@ -1204,8 +1217,11 @@ var hex_sha1 = function(message) {
             toggleCall: function (ev) {
                 ev.stopPropagation();
 
+                this.sendMessageStanza(QUERY_RESOURCE);
+
                 converse.emit('onCallButtonClicked', {
-                    connection: converse.connection
+                    connection: converse.connection,
+                    model: this.model
                 });
             },
 
